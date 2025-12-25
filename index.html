@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>NOEL 2025: Gallery Ring</title>
+    <title>NOEL 2025: Smart Circle</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #020205; font-family: 'Times New Roman', serif; touch-action: none; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -25,10 +25,8 @@
             pointer-events: none;
         }
 
-        /* Đã xóa thanh công cụ .glass-dock theo yêu cầu */
-        
         .hint {
-            position: absolute; bottom: 30px; /* Đẩy hint xuống thấp vì không còn dock */
+            position: absolute; bottom: 30px; 
             color: rgba(255, 255, 200, 0.4); font-size: 10px; letter-spacing: 2px;
             text-transform: uppercase; font-family: sans-serif;
             text-shadow: 0 0 10px rgba(255,215,0,0.3);
@@ -76,8 +74,7 @@
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-        // --- CẤU HÌNH THƯ MỤC & NỘI DUNG ---
-        // Lưu ý: Đổi tên folder 'sinh nhat' thành 'images' nếu muốn chuẩn xác nhất
+        // --- CẤU HÌNH ---
         const FOLDER_NAME = 'sinh nhật'; 
 
         const USER_CONTENT = {
@@ -89,14 +86,13 @@
                 "5.jpg",
                 "6.jpg",
                 "7.jpg"
-                // "anh_khac.png"
             ],
             wishes: [
                 "Merry Christmas!",
                 "Happy New Year 2025",
                 "Luôn vui vẻ nhé!",
                 "Love u <3",
-                " Iu em nhất"
+                "Iu em nhất"
             ]
         };
 
@@ -123,7 +119,6 @@
         let raycaster = new THREE.Raycaster();
         let mouse = new THREE.Vector2();
         
-        // Biến đếm số lượng ảnh/thiệp để sắp xếp vị trí
         let mediaGlobalCount = 0;
 
         async function init() {
@@ -284,7 +279,7 @@
             particleSystem.push(new Particle(group, type, false, mediaGlobalCount));
         }
 
-        // ... Các hàm tạo môi trường ...
+        // ... Môi trường ...
         function createWideSaturnRing() {
             ringContainer = new THREE.Group();
             ringContainer.rotation.x = Math.PI / 7; ringContainer.rotation.z = Math.PI / 10;
@@ -348,7 +343,6 @@
         class Particle {
             constructor(mesh, type, isDust = false, mediaIdx = 0) {
                 this.mesh = mesh; this.type = type; this.isDust = isDust;
-                // Lưu lại số thứ tự của ảnh/thiệp để tính vị trí
                 this.mediaIdx = mediaIdx; 
                 
                 this.posTree = new THREE.Vector3(); this.posScatter = new THREE.Vector3();
@@ -368,19 +362,26 @@
                     this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
                     this.mesh.lookAt(0, y, 0); 
 
-                    // --- VỊ TRÍ SCATTER MỚI: VÒNG TRÒN TRIỂN LÃM (GALLERY RING) ---
-                    // Sắp xếp đều nhau trên một vòng tròn
-                    const ringRadius = 45; // Bán kính vòng tròn ảnh
-                    // Góc cách đều nhau (ví dụ mỗi ảnh cách nhau 30 độ)
-                    // Dùng mediaIdx để mỗi ảnh có 1 góc riêng
-                    const angleStep = Math.PI / 4; // Khoảng cách giữa các ảnh
-                    const ringAngle = this.mediaIdx * angleStep; 
+                    // --- VỊ TRÍ SCATTER THÔNG MINH (SMART CIRCLE) ---
+                    // 1. Tính tổng số lượng để chia góc đều nhau
+                    const totalMedia = USER_CONTENT.images.length + USER_CONTENT.wishes.length;
+                    
+                    // 2. Góc chia đều (360 độ / tổng số ảnh)
+                    const angleStep = (Math.PI * 2) / totalMedia; 
+                    
+                    // 3. Tự động mở rộng bán kính nếu nhiều ảnh
+                    const baseRadius = 55;
+                    const ringRadius = baseRadius + (totalMedia * 1.5); 
 
-                    // Tính tọa độ trên vòng tròn
+                    // 4. Tính toán vị trí
+                    // mediaIdx - 1 vì index bắt đầu từ 1 trong vòng lặp addMediaFrame
+                    const ringAngle = (this.mediaIdx - 1) * angleStep; 
+
                     const sx = ringRadius * Math.cos(ringAngle);
                     const sz = ringRadius * Math.sin(ringAngle);
-                    // Nhấp nhô nhẹ lên xuống cho sinh động
-                    const sy = (this.mediaIdx % 2 === 0) ? 3 : -3; 
+                    
+                    // 5. So le độ cao để tránh va chạm (Cái cao cái thấp)
+                    const sy = (this.mediaIdx % 2 === 0) ? 6 : -6; 
 
                     this.posScatter.set(sx, sy, sz);
 
@@ -388,8 +389,6 @@
                     const r = 2 + Math.random() * 14; const theta = Math.random() * Math.PI * 2;
                     const y = (Math.random() - 0.5) * h * 1.3; 
                     this.posTree.set(r * Math.cos(theta), y, r * Math.sin(theta));
-                    
-                    // Scatter random cho bụi
                     const rScatter = 25 + Math.random() * 60; const thetaS = Math.random() * Math.PI * 2; const phi = Math.acos(2 * Math.random() - 1);
                     this.posScatter.set(rScatter * Math.sin(phi)*Math.cos(thetaS), rScatter * Math.sin(phi)*Math.sin(thetaS), rScatter * Math.cos(phi));
                 } else {
@@ -397,8 +396,6 @@
                     const r = CONFIG.particles.treeRadius * Math.pow(t, 0.75) * (0.3 + 0.7 * Math.sqrt(Math.random()));
                     const angle = t * 30 * Math.PI + Math.random() * Math.PI * 2;
                     this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
-                    
-                    // Scatter random cho hạt trang trí
                     const rScatter = 25 + Math.random() * 60; const thetaS = Math.random() * Math.PI * 2; const phi = Math.acos(2 * Math.random() - 1);
                     this.posScatter.set(rScatter * Math.sin(phi)*Math.cos(thetaS), rScatter * Math.sin(phi)*Math.sin(thetaS), rScatter * Math.cos(phi));
                 }
@@ -414,19 +411,14 @@
                 }
                 const speed = this.isDust ? 2.0 : 3.0; this.mesh.position.lerp(target, speed * dt);
                 
-                // --- XỬ LÝ XOAY ---
                 if(STATE.mode !== 'TREE') { 
-                    // Nếu là ảnh/thiệp ở chế độ SCATTER: KHÔNG XOAY TRÒN, MÀ HƯỚNG MẶT RA NGOÀI
                     if (this.type === 'PHOTO' || this.type === 'CARD' || this.type === 'ERROR') {
-                        // Hướng mặt ra xa tâm (0,0,0) để camera xoay quanh sẽ nhìn thấy mặt trước
                         this.mesh.lookAt(this.mesh.position.x * 2, this.mesh.position.y, this.mesh.position.z * 2);
                     } else {
-                        // Các hạt khác xoay tự do
                         this.mesh.rotation.x += dt; this.mesh.rotation.y += dt; 
                     }
                 } 
                 else { 
-                    // Chế độ TREE: Xoay nhẹ theo trục Y
                     if (this.type !== 'PHOTO' && this.type !== 'CARD' && this.type !== 'ERROR') { 
                         this.mesh.rotation.set(0, this.mesh.rotation.y + dt*0.3, 0); 
                     } 
@@ -464,8 +456,6 @@
                 renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
             });
             
-            // Xóa các event listener của nút bấm cũ vì nút đã bị xóa
-            
             const canvas = renderer.domElement; let lastTapTime = 0;
             canvas.addEventListener('pointerup', (e) => {
                 const currentTime = new Date().getTime(); const tapLength = currentTime - lastTapTime;
@@ -476,7 +466,6 @@
         function toggleMode() { if (STATE.mode === 'TREE' || STATE.mode === 'FOCUS') switchMode('SCATTER'); else switchMode('TREE'); }
         function switchMode(newMode) {
             STATE.mode = newMode; STATE.focusTarget = null; controls.autoRotate = true;
-            // Xóa code xử lý active class cho nút bấm vì không còn nút
         }
         function handleTap(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1; mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -505,5 +494,3 @@
     </script>
 </body>
 </html>
-
-
