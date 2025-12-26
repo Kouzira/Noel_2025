@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>NOEL 2025: Smart Circle</title>
+    <title>NOEL 2025: Golden Flash</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #020205; font-family: 'Times New Roman', serif; touch-action: none; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -89,7 +89,7 @@
             ],
             wishes: [
                 "Merry Christmas!",
-                "Happy New Year 2026",
+                "Happy New Year 2025",
                 "Luôn vui vẻ nhé!",
                 "Love u <3",
                 "Iu em nhất"
@@ -98,8 +98,15 @@
 
         const CONFIG = {
             colors: {
-                bg: 0x020205, gold: 0xffd700, green: 0x0f3b1e, dust: 0xfffee0, 
-                ring: 0xffdcb3, cloud: 0x112244, cardBg: 0xf2eecb, cardText: 0x880000
+                bg: 0x020205, 
+                gold: 0xffd700, 
+                // Cập nhật màu xanh sáng hơn (Emerald)
+                green: 0x00a86b, 
+                dust: 0xfffee0, 
+                ring: 0xffdcb3, 
+                cloud: 0x112244, 
+                cardBg: 0xf2eecb, 
+                cardText: 0x880000
             },
             particles: {
                 count: 3200, dustCount: 3500, ringCount: 2500, 
@@ -113,8 +120,12 @@
         let mainGroup, photoGroup, envGroup, ringContainer; 
         let clock = new THREE.Clock();
         let particleSystem = [];
+        
         let redParticles = []; 
-        let lastFlashTime = 0; 
+        let goldParticles = []; // Mảng chứa các khối vàng để nháy
+        let lastRedFlashTime = 0; 
+        let lastGoldFlashTime = 0;
+        
         let snowSystem = [];
         let raycaster = new THREE.Raycaster();
         let mouse = new THREE.Vector2();
@@ -129,16 +140,12 @@
             createThickMagicDust(); 
             createWideSaturnRing(); 
             createSnow();
-            
             await loadUserContent(); 
-            
             setupPostProcessing();
             setupInteractions();
-            
             const loader = document.getElementById('loader');
             loader.style.opacity = 0;
             setTimeout(() => loader.remove(), 800);
-
             animate();
         }
 
@@ -167,14 +174,14 @@
             mainGroup = new THREE.Group();
             photoGroup = new THREE.Group();
             envGroup = new THREE.Group();
-            
             mainGroup.add(photoGroup);
             scene.add(envGroup); 
             scene.add(mainGroup);
         }
 
         function setupLights() {
-            const ambient = new THREE.AmbientLight(0xffffff, 0.2);
+            // Tăng sáng môi trường lên một chút để các khối không bị đen
+            const ambient = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambient);
             const point = new THREE.PointLight(0xffaa55, 4.0, 55);
             point.position.set(0, 8, 0);
@@ -273,13 +280,10 @@
             frame.userData = { isInteractable: true, parentGroup: group };
             
             photoGroup.add(group); 
-            
-            // Tăng biến đếm và truyền vào Particle
             mediaGlobalCount++;
             particleSystem.push(new Particle(group, type, false, mediaGlobalCount));
         }
 
-        // ... Môi trường ...
         function createWideSaturnRing() {
             ringContainer = new THREE.Group();
             ringContainer.rotation.x = Math.PI / 7; ringContainer.rotation.z = Math.PI / 10;
@@ -308,17 +312,52 @@
         function createParticles() {
             const geoBox = new THREE.BoxGeometry(0.45, 0.45, 0.45);
             const geoSphere = new THREE.SphereGeometry(0.3, 16, 16);
-            const matGold = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, metalness: 1.0, roughness: 0.1, emissive: 0xffaa00, emissiveIntensity: 0.5 });
-            const matRedBase = new THREE.MeshPhysicalMaterial({ color: 0xff2255, metalness: 0.5, roughness: 0.1, clearcoat: 1.0, emissive: 0xff0033, emissiveIntensity: 0.5 });
-            const matGreen = new THREE.MeshStandardMaterial({ color: CONFIG.colors.green, metalness: 0.1, roughness: 0.8 });
+            
+            // --- MATERIAL VÀNG (CẬP NHẬT ĐỂ NHÁY) ---
+            // Clone cho mỗi hạt để nháy riêng lẻ
+            const matGoldBase = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.colors.gold, 
+                metalness: 1.0, 
+                roughness: 0.1, 
+                emissive: 0xffaa00, 
+                emissiveIntensity: 0.5 
+            });
+
+            const matRedBase = new THREE.MeshPhysicalMaterial({ 
+                color: 0xff2255, metalness: 0.5, roughness: 0.1, clearcoat: 1.0, 
+                emissive: 0xff0033, emissiveIntensity: 0.5 
+            });
+
+            // --- MATERIAL XANH (CẬP NHẬT SÁNG HƠN) ---
+            const matGreen = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.colors.green, 
+                metalness: 0.3, 
+                roughness: 0.5,
+                emissive: 0x004400, // Tự phát sáng nhẹ màu xanh để không bị đen
+                emissiveIntensity: 0.2
+            });
+
             for (let i = 0; i < CONFIG.particles.count; i++) {
                 let mesh, type = 'DECO'; const r = Math.random();
-                if (r < 0.6) { mesh = new THREE.Mesh(geoBox, matGreen); type = 'LEAF'; }
-                else if (r < 0.85) { mesh = new THREE.Mesh(geoBox, matGold); type = 'GOLD_BOX'; }
-                else { mesh = new THREE.Mesh(geoSphere, matRedBase.clone()); type = 'RED_SPHERE'; }
+                if (r < 0.6) { 
+                    mesh = new THREE.Mesh(geoBox, matGreen); type = 'LEAF'; 
+                }
+                else if (r < 0.85) { 
+                    // Clone material vàng để nháy độc lập
+                    mesh = new THREE.Mesh(geoBox, matGoldBase.clone()); type = 'GOLD_BOX'; 
+                }
+                else { 
+                    mesh = new THREE.Mesh(geoSphere, matRedBase.clone()); type = 'RED_SPHERE'; 
+                }
+                
                 mesh.position.set(0, -100, 0); const s = 0.5 + Math.random() * 0.6; mesh.scale.set(s,s,s);
-                mainGroup.add(mesh); const p = new Particle(mesh, type);
-                particleSystem.push(p); if (type === 'RED_SPHERE') redParticles.push(p);
+                mainGroup.add(mesh); 
+                
+                const p = new Particle(mesh, type);
+                particleSystem.push(p); 
+                
+                if (type === 'RED_SPHERE') redParticles.push(p);
+                if (type === 'GOLD_BOX') goldParticles.push(p); // Thêm vào danh sách vàng
             }
         }
 
@@ -344,45 +383,32 @@
             constructor(mesh, type, isDust = false, mediaIdx = 0) {
                 this.mesh = mesh; this.type = type; this.isDust = isDust;
                 this.mediaIdx = mediaIdx; 
-                
                 this.posTree = new THREE.Vector3(); this.posScatter = new THREE.Vector3();
                 this.baseScale = mesh.scale.x; this.blinkSpeed = 2 + Math.random() * 4; 
                 this.blinkOffset = Math.random() * 100; this.flashIntensity = 0; 
                 this.calculatePositions();
             }
             flash() { this.flashIntensity = 1.0; }
+            
             calculatePositions() {
                 const h = CONFIG.particles.treeHeight; const halfH = h / 2;
                 
                 if (this.type === 'PHOTO' || this.type === 'CARD' || this.type === 'ERROR') {
-                    // --- VỊ TRÍ TRÊN CÂY ---
                     let t = Math.random(); const y = (1 - t) * h - halfH;
                     const r = (CONFIG.particles.treeRadius * Math.pow(t, 0.75)) + 1.5; 
                     const angle = Math.random() * Math.PI * 2;
                     this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
                     this.mesh.lookAt(0, y, 0); 
 
-                    // --- VỊ TRÍ SCATTER THÔNG MINH (SMART CIRCLE) ---
-                    // 1. Tính tổng số lượng để chia góc đều nhau
+                    // Smart Circle
                     const totalMedia = USER_CONTENT.images.length + USER_CONTENT.wishes.length;
-                    
-                    // 2. Góc chia đều (360 độ / tổng số ảnh)
                     const angleStep = (Math.PI * 2) / totalMedia; 
-                    
-                    // 3. Tự động mở rộng bán kính nếu nhiều ảnh
                     const baseRadius = 55;
                     const ringRadius = baseRadius + (totalMedia * 1.5); 
-
-                    // 4. Tính toán vị trí
-                    // mediaIdx - 1 vì index bắt đầu từ 1 trong vòng lặp addMediaFrame
                     const ringAngle = (this.mediaIdx - 1) * angleStep; 
-
                     const sx = ringRadius * Math.cos(ringAngle);
                     const sz = ringRadius * Math.sin(ringAngle);
-                    
-                    // 5. So le độ cao để tránh va chạm (Cái cao cái thấp)
                     const sy = (this.mediaIdx % 2 === 0) ? 6 : -6; 
-
                     this.posScatter.set(sx, sy, sz);
 
                 } else if (this.isDust) {
@@ -417,8 +443,7 @@
                     } else {
                         this.mesh.rotation.x += dt; this.mesh.rotation.y += dt; 
                     }
-                } 
-                else { 
+                } else { 
                     if (this.type !== 'PHOTO' && this.type !== 'CARD' && this.type !== 'ERROR') { 
                         this.mesh.rotation.set(0, this.mesh.rotation.y + dt*0.3, 0); 
                     } 
@@ -429,18 +454,22 @@
                     const blink = Math.sin(time * this.blinkSpeed + this.blinkOffset);
                     const brightness = 0.6 + 0.4 * blink; this.mesh.material.opacity = brightness;
                     targetScale = this.baseScale * (0.8 + 0.4 * brightness);
-                } else if (this.type === 'RED_SPHERE') {
+                } 
+                else if (this.type === 'RED_SPHERE' || this.type === 'GOLD_BOX') {
+                    // Logic Flash chung cho cả Đỏ và Vàng
                     if (this.flashIntensity > 0.01) {
                         this.flashIntensity = THREE.MathUtils.lerp(this.flashIntensity, 0, dt * 3.0);
+                        // Khi flash, emissive tăng vọt
                         this.mesh.material.emissiveIntensity = 0.5 + this.flashIntensity * 4.0;
                         targetScale = this.baseScale * (1 + 0.3 * this.flashIntensity);
                     } else {
+                        // Nhấp nháy nhẹ bình thường
                         const blink = Math.sin(time * 3 + this.blinkOffset);
-                        this.mesh.material.emissiveIntensity = 0.5; targetScale = this.baseScale * (1 + 0.05 * blink);
+                        this.mesh.material.emissiveIntensity = 0.5; 
+                        targetScale = this.baseScale * (1 + 0.05 * blink);
                     }
-                } else if (this.type === 'GOLD_BOX') {
-                     const blink = Math.sin(time * 3 + this.blinkOffset); targetScale = this.baseScale * (1 + 0.15 * blink);
-                } else if (this.type === 'PHOTO' || this.type === 'CARD' || this.type === 'ERROR') {
+                }
+                else if (this.type === 'PHOTO' || this.type === 'CARD' || this.type === 'ERROR') {
                     if (STATE.mode === 'TREE') targetScale = 0.25; else targetScale = 1.0; 
                 }
                 if (STATE.mode === 'FOCUS' && (this.mesh === STATE.focusTarget || this.mesh.parent === STATE.focusTarget)) {
@@ -455,7 +484,6 @@
                 camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
             });
-            
             const canvas = renderer.domElement; let lastTapTime = 0;
             canvas.addEventListener('pointerup', (e) => {
                 const currentTime = new Date().getTime(); const tapLength = currentTime - lastTapTime;
@@ -481,8 +509,19 @@
         }
         function animate() {
             requestAnimationFrame(animate); const dt = clock.getDelta(); const time = clock.elapsedTime; controls.update();
-            if (STATE.mode === 'TREE' && redParticles.length > 0) {
-                if (time - lastFlashTime > 2.0) { const randomIdx = Math.floor(Math.random() * redParticles.length); redParticles[randomIdx].flash(); lastFlashTime = time; }
+            if (STATE.mode === 'TREE') {
+                // Nháy ngẫu nhiên cho hạt ĐỎ
+                if (redParticles.length > 0 && time - lastRedFlashTime > 2.5) {
+                    const rIdx = Math.floor(Math.random() * redParticles.length);
+                    redParticles[rIdx].flash();
+                    lastRedFlashTime = time;
+                }
+                // Nháy ngẫu nhiên cho hạt VÀNG (xen kẽ với đỏ)
+                if (goldParticles.length > 0 && time - lastGoldFlashTime > 1.8) {
+                    const gIdx = Math.floor(Math.random() * goldParticles.length);
+                    goldParticles[gIdx].flash();
+                    lastGoldFlashTime = time;
+                }
             }
             if (ringContainer) ringContainer.rotation.y -= dt * 0.12; 
             const snowPos = snowSystem[0].geometry.attributes.position.array;
@@ -494,4 +533,3 @@
     </script>
 </body>
 </html>
-
